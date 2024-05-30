@@ -16,46 +16,58 @@ class ChatLoggerSession:
         self,
         appID,
         appSecret,
-        userID,
-        userName,
-        accessToken,
-        refreshToken,
-        channels,
-        logDir,
         refreshCallback,
     ):
         self.appID = appID
         self.appSecret = appSecret
-        self.userID = userID
-        self.userName = userName
-        self.accessToken = accessToken
-        self.refreshToken = refreshToken
-        self.channels = channels
-        self.logDir = logDir
         self.refreshCallback = refreshCallback
+        self.userID = ""
+        self.userName = ""
+        self.accessToken = ""
+        self.refreshToken = ""
+        self.channels = []
+        self.logDir = ""
 
-    async def initialise(self):
-        print(f"Initialising logger user: '{self.userName}'")
+        self.twitch = None
+        self.chat = None
 
-        self.twitch = await Twitch(self.appID, self.appSecret)
-        await self.twitch.set_user_authentication(
-            self.accessToken, ChatLoggerSession.SCOPE, self.refreshToken
-        )
+    async def initialise(self, userID, userName, accessToken, refreshToken, channels, logDir):
+        self.logDir = logDir
 
-        self.twitch.user_auth_refresh_callback = self.userAuthRefreshed
+        print(f"Initialising logger user: '{userName}'")
 
-        self.chat = await Chat(self.twitch)
+        if self.userID != userID or self.userName != userName or self.accessToken != accessToken or self.refreshToken != refreshToken or self.channels != channels:
+            if self.twitch or self.chat:
+                await self.shutdown()
 
-        self.chat.register_event(ChatEvent.READY, self.onReady)
-        self.chat.register_event(ChatEvent.MESSAGE, self.onMessage)
-        self.chat.register_event(ChatEvent.JOIN, self.onJoin)
-        self.chat.register_event(ChatEvent.USER_LEFT, self.onLeave)
+            self.userID = userID
+            self.userName = userName
+            self.accessToken = accessToken
+            self.refreshToken = refreshToken
+            self.channels = channels
 
-        self.chat.start()
+            self.twitch = await Twitch(self.appID, self.appSecret)
+            await self.twitch.set_user_authentication(
+                self.accessToken, ChatLoggerSession.SCOPE, self.refreshToken
+            )
+
+            self.twitch.user_auth_refresh_callback = self.userAuthRefreshed
+
+            self.chat = await Chat(self.twitch)
+
+            self.chat.register_event(ChatEvent.READY, self.onReady)
+            self.chat.register_event(ChatEvent.MESSAGE, self.onMessage)
+            self.chat.register_event(ChatEvent.JOIN, self.onJoin)
+            self.chat.register_event(ChatEvent.USER_LEFT, self.onLeave)
+
+            self.chat.start()
 
     async def shutdown(self):
         self.chat.stop()
         await self.twitch.close()
+
+        self.chat = None
+        self.twitch = None
 
     async def onReady(self, readyEvent):
         print(f"'{self.userName}' joining {self.channels}")
@@ -87,13 +99,15 @@ class ChatLoggerSession:
                 f"{now.hour:02}:{now.minute:02}:{now.second:02} - {event}\n")
 
     async def onJoin(self, joinEvent):
-        print(f"User: '{joinEvent.user_name}' joined '{joinEvent.room.name}")
+        # print(f"User: '{joinEvent.user_name}' joined '{joinEvent.room.name}")
+
         self.logEvent(joinEvent.room.name,
                       f"User: '{joinEvent.user_name}' joined")
 
     async def onLeave(self, leaveEvent):
-        print(f"User: '{leaveEvent.user_name}' left '{leaveEvent.room_name}")
-        self.logEvent(leaveEvent.room.name,
+        # print(f"User: '{leaveEvent.user_name}' left '{leaveEvent.room_name}")
+
+        self.logEvent(leaveEvent.room_name,
                       f"User: '{leaveEvent.user_name}' left")
 
     async def userAuthRefreshed(self, accessToken, refreshToken):
@@ -103,3 +117,6 @@ class ChatLoggerSession:
 
         if self.refreshCallback:
             self.refreshCallback(self.userID, accessToken, refreshToken)
+
+    def __repr__(self):
+        return self.userID

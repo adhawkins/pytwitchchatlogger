@@ -15,11 +15,16 @@ class Config:
             with open(Config.FILENAME) as f:
                 self.config = json.load(f)
 
-        if not "users" in self.config:
-            self.config["users"] = []
+                if not "users" in self.config:
+                    self.config["users"] = []
 
-        if not "logdir" in self.config:
-            self.config["logdir"] = ""
+                if not "logdir" in self.config:
+                    self.config["logdir"] = ""
+        else:
+            self.config = {
+                "users": [],
+                "logdir": "",
+            }
 
     def saveConfig(self):
         with open(Config.FILENAME, "w") as f:
